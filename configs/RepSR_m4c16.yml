@@ -1,0 +1,33 @@
+## parameters for ecbsr
+scale: 4
+colors: 1
+m_block: 4
+c_channel: 16
+pretrain: Null
+
+## parameters for model training
+## 小模型：patch_size=64,batch_size=32,lr=4*10-4;大模型：patch_size=48,batch_size=32,lr=2*10-4
+patch_size: 256
+batch_size: 32
+data_augment: 1
+epochs: 1000
+log_every: 100
+test_every: 1
+log_path: "./weights"
+lr: 0.0004
+
+## hardware specification
+gpu_id: 0
+threads: 4
+
+## data specification
+div2k_hr_path: /media/Data/jl/sr_data/DIV2K/DIV2K_train_HR
+div2k_lr_path: /media/Data/jl/sr_data/DIV2K/DIV2K_train_LR_bicubic
+set5_hr_path: /media/Data/jl/sr_data/benchmark/Set5/HR
+set5_lr_path: /media/Data/jl/sr_data/benchmark/Set5/LR_bicubic
+set14_hr_path: /media/Data/jl/sr_data/benchmark/Set14/HR
+set14_lr_path: /media/Data/jl/sr_data/benchmark/Set14/LR_bicubic
+b100_hr_path: /media/Data/jl/sr_data/benchmark/B100/HR
+b100_lr_path: /media/Data/jl/sr_data/benchmark/B100/LR_bicubic
+u100_hr_path: /media/Data/jl/sr_data/benchmark/Urban100/HR
+u100_lr_path: /media/Data/jl/sr_data/benchmark/Urban100/LR_bicubic
