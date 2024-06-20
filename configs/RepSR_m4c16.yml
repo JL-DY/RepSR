@@ -6,8 +6,8 @@ c_channel: 16
 pretrain: Null
 
 ## parameters for model training
-## 小模型：patch_size=64,batch_size=32,lr=4*10-4;大模型：patch_size=48,batch_size=32,lr=2*10-4
-patch_size: 256
+## 小模型：patch_size=64,batch_size=32,lr=4*10-4; 大模型：patch_size=48,batch_size=32,lr=2*10-4
+patch_size: 400
 batch_size: 32
 data_augment: 1
 epochs: 1000
@@ -17,12 +17,55 @@ log_path: "./weights"
 lr: 0.0004
 
 ## hardware specification
-gpu_id: 0
+gpu_id: 1
 threads: 4
+
+# 是否使用两阶段退化过程
+use_degradation: True
+degradation: 
+  gt_usm: True
+  # generate kernels
+  blur_kernel_size: 15 # 必须是奇数
+  kernel_list: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
+  kernel_prob: [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
+  sinc_prob: 0.0
+  blur_sigma: [0.2, 1.3]
+  betag_range: [0.5, 4] ## 广义高斯模糊核
+  betap_range: [1, 2] ## plateau模糊核
+
+  blur_kernel_size2: 15 # 必须是奇数
+  kernel_list2: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
+  kernel_prob2: [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
+  sinc_prob2: 0.0
+  blur_sigma2: [0.2, 1.1]
+  betag_range2: [0.5, 4]
+  betap_range2: [1, 2]
+
+  final_sinc_prob: 0.0
+
+  # Two-stage degradation operation
+  # the first degradation process
+  resize_prob: [0.2, 0.7, 0.1]  # up, down, keep
+  resize_range: [0.8, 1.2]
+  gaussian_noise_prob: 0.1
+  noise_range: [1, 3]
+  poisson_scale_range: [0.05, 0.3]
+  gray_noise_prob: 0.2
+  jpeg_range: [90, 95] # 更改了jpeg有损压缩
+
+  # the second degradation process
+  second_blur_prob: 0.35
+  resize_prob2: [0.3, 0.4, 0.3]  # up, down, keep
+  resize_range2: [0.8, 1.2]
+  gaussian_noise_prob2: 0.1
+  noise_range2: [1, 3]
+  poisson_scale_range2: [0.05, 0.15]
+  gray_noise_prob2: 0.1
+  jpeg_range2: [90, 95] # 更改了jpeg有损压缩
 
 ## data specification
 div2k_hr_path: /media/Data/jl/sr_data/DIV2K/DIV2K_train_HR
-div2k_lr_path: /media/Data/jl/sr_data/DIV2K/DIV2K_train_LR_bicubic
+div2k_lr_path: /media/Data/jl/sr_data/DIV2K/DIV2K_train_LR_bicubic  # 采用两阶段退化过程时，低分辨率图像由高分辨率图像生成
 set5_hr_path: /media/Data/jl/sr_data/benchmark/Set5/HR
 set5_lr_path: /media/Data/jl/sr_data/benchmark/Set5/LR_bicubic
 set14_hr_path: /media/Data/jl/sr_data/benchmark/Set14/HR
