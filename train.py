@@ -19,40 +19,6 @@ parser = argparse.ArgumentParser(description='RepSR')
 ## yaml configuration files
 parser.add_argument('--config', type=str, default="./configs/RepSR_m4c16.yml", help = 'pre-config file for training')
 
-## paramters for ecbsr
-parser.add_argument('--scale', type=int, default=4, help = 'scale for sr network')
-parser.add_argument('--colors', type=int, default=1, help = '1(Y channls of YCbCr)')
-parser.add_argument('--m_block', type=int, default=4, help = 'number of ecb')
-parser.add_argument('--c_channel', type=int, default=16, help = 'channels of ecb')
-parser.add_argument('--pretrain', type=str, default=None, help = 'path of pretrained model')
-
-## parameters for model training
-parser.add_argument('--patch_size', type=int, default=64, help = 'patch size of HR image')
-parser.add_argument('--batch_size', type=int, default=32, help = 'batch size of training data')
-parser.add_argument('--data_augment', type=int, default=1, help = 'data augmentation for training')
-parser.add_argument('--epochs', type=int, default=1000, help = 'number of epochs')
-parser.add_argument('--test_every', type=int, default=1, help = 'test the model every N epochs')
-parser.add_argument('--log_every', type=int, default=100, help = 'print log of loss, every N steps')
-parser.add_argument('--log_path', type=str, default="./weights/")
-parser.add_argument('--lr', type=float, default=4e-4, help = 'learning rate of optimizer')
-
-## hardware specification
-parser.add_argument('--gpu_id', type=int, default=0, help = 'gpu id for training')
-parser.add_argument('--threads', type=int, default=4, help = 'number of threads for training')
-
-## dataset specification
-parser.add_argument('--div2k_hr_path', type=str, default='/media/Data/jl/sr_data/DIV2K/DIV2K_train_HR', help = '')
-parser.add_argument('--div2k_lr_path', type=str, default='/media/Data/jl/sr_data/DIV2K/DIV2K_train_LR_bicubic', help = '')
-parser.add_argument('--set5_hr_path', type=str, default='/media/Data/jl/sr_data/benchmark/Set5/HR', help = '')
-parser.add_argument('--set5_lr_path', type=str, default='/media/Data/jl/sr_data/benchmark/Set5/LR_bicubic', help = '')
-parser.add_argument('--set14_hr_path', type=str, default='/media/Data/jl/sr_data/benchmark/Set14/HR', help = '')
-parser.add_argument('--set14_lr_path', type=str, default='/media/Data/jl/sr_data/benchmark/Set14/LR_bicubic', help = '')
-parser.add_argument('--b100_hr_path', type=str, default='/media/Data/jl/sr_data/benchmark/B100/HR', help = '')
-parser.add_argument('--b100_lr_path', type=str, default='/media/Data/jl/sr_data/benchmark/B100/LR_bicubic', help = '')
-parser.add_argument('--u100_hr_path', type=str, default='/media/Data/jl/sr_data/benchmark/Urban100/HR', help = '')
-parser.add_argument('--u100_lr_path', type=str, default='/media/Data/jl/sr_data/benchmark/Urban100/LR_bicubic', help = '')
-
-
 if __name__ == '__main__':
     args = parser.parse_args()
     if args.config:
@@ -72,13 +38,14 @@ if __name__ == '__main__':
     torch.set_num_threads(args.threads)
 
     div2k = DIV2K(
+        opt,
         args.div2k_hr_path, 
         args.div2k_lr_path, 
         train=True, 
         augment=args.data_augment, 
         scale=args.scale, 
         colors=args.colors, 
-        patch_size=args.patch_size, 
+        patch_size=args.patch_size
     )
 
     set5  = Benchmark(args.set5_hr_path, args.set5_lr_path, scale=args.scale, colors=args.colors)
@@ -94,7 +61,7 @@ if __name__ == '__main__':
     valid_dataloaders += [{'name': 'u100', 'dataloader': DataLoader(dataset=u100, batch_size=1, shuffle=False)}]
 
     ## definitions of model, loss, and optimizer
-    model = RepSR_Net(args.m_block, args.c_channel, args.scale, args.colors).to(device)
+    model = RepSR_Net(args.m_block, args.c_channel, args.scale, args.colors, opt, device).to(device)
     loss_func = nn.L1Loss()
     # content_loss = utils.PerceptualLoss(nn.MSELoss()) # 感知损失
     
@@ -130,20 +97,19 @@ if __name__ == '__main__':
     frozenBN = int(0.9*args.epochs)
     timer_start = time.time()
     for epoch in range(args.epochs):
-        if(epoch==frozenBN):
+        epoch_loss = 0.0
+        stat_dict['epochs'] = epoch
+        model = model.train()
+        if(epoch>=frozenBN):
             print("##===========frozenBN, Epoch: {}=============##".format(epoch))
             for m in model.modules():
                 if isinstance(m, nn.BatchNorm2d):
                     m.eval()
-        epoch_loss = 0.0
-        stat_dict['epochs'] = epoch
-        model = model.train()
         print("##===========Epoch: {}=============##".format(epoch))
         for iter, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
             # lr, hr = batch
-            lr, hr = batch
-            lr, hr = lr.to(device), hr.to(device)
+            hr, lr = model.feed_data(batch)
             sr = model(lr)
             loss = loss_func(sr, hr)
             loss.backward()
@@ -186,8 +152,8 @@ if __name__ == '__main__':
                     hr = hr[:, :, args.scale:-args.scale, args.scale:-args.scale]
                     sr = sr[:, :, args.scale:-args.scale, args.scale:-args.scale]
                     # quantize
-                    hr = hr.clamp(0, 255)
-                    sr = sr.clamp(0, 255)
+                    hr = hr.clamp(0, 1)
+                    sr = sr.clamp(0, 1)
                     # calculate psnr
                     psnr = utils.calc_psnr(sr, hr)       
                     ssim = utils.calc_ssim(sr, hr)         
