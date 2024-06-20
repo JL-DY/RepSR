@@ -34,7 +34,7 @@ patch_size=256，epoch=1000，没有完全按照论文中的来
 
 后续添加了二阶段降质算法进行下采样后，能对低分辨率图像的噪声进行明显的改善，[二阶段降质算法的官方来源](https://github.com/XPixelGroup/BasicSR)
 
-由于个人不太习惯用BasicSR这套框架，因此将二阶段降质算法单独拧出来并合并到RepSR中。拧出来的二阶段降质算法和使用方法在另一个[仓库](https://github.com/JL-DY/Degradation)中
+由于个人不太习惯用BasicSR这套框架，因此将二阶段降质算法单独拧出来并合并到RepSR中。拧出来的二阶段降质算法和使用方法在另一个[仓库](https://github.com/JL-DY/Degradation)中可以了解并查看
 
 
 
