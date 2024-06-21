@@ -38,9 +38,9 @@ class DIV2K(data.Dataset):
         else:          start_idx, end_idx = 801, 901
 
         if opt["use_degradation"]:
-            for i in range(start_idx, end_idx):
-                idx = str(i).zfill(4)
-                hr_filename = os.path.join(self.HR_folder, idx + self.img_postfix)
+            img_name = os.listdir(HR_folder)
+            for i in img_name:
+                hr_filename = os.path.join(self.HR_folder, i)
                 self.hr_filenames.append(hr_filename)
         else:
             for i in range(start_idx, end_idx):
