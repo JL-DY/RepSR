@@ -3,36 +3,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .RepSRBlock import RepSR_Block
 import random
-from utils.utils import filter2D
+from utils.utils import DiffJPEG, USMSharp, filter2D
 import numpy as np
 from utils.degradation import random_add_gaussian_noise_pt, random_add_poisson_noise_pt
 import cv2 as cv
-
-class USMSharp(torch.nn.Module):
-    def __init__(self, radius=50, sigma=0):
-        super(USMSharp, self).__init__()
-        if radius % 2 == 0:
-            radius += 1
-        self.radius = radius
-        kernel = cv.getGaussianKernel(radius, sigma)
-        kernel = torch.FloatTensor(np.dot(kernel, kernel.transpose())).unsqueeze_(0)
-        self.register_buffer('kernel', kernel)
-
-    def forward(self, img, weight=0.5, threshold=10):
-        blur = filter2D(img, self.kernel)
-        residual = img - blur
-
-        mask = torch.abs(residual) * 255 > threshold
-        mask = mask.float()
-        soft_mask = filter2D(mask, self.kernel)
-        sharp = img + weight * residual
-        sharp = torch.clip(sharp, 0, 1)
-        return soft_mask * sharp + (1 - soft_mask) * img
+import torchvision.transforms.functional as Fv
     
 class RepSR_Net(nn.Module):
     def __init__(self, m, c, scale, colors, opt, device):
-        self.opt = opt
         super(RepSR_Net, self).__init__()
+        self.opt = opt
+        self.jpeger = DiffJPEG(differentiable=False).cuda()  # simulate JPEG compression artifacts
         self.usm_sharpener = USMSharp().cuda()
         self.device = device
         self.m_repsr_block = m
@@ -102,9 +83,10 @@ class RepSR_Net(nn.Module):
                 clip=True,
                 rounds=False)
         # JPEG compression
-        # jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.opt['jpeg_range'])
-        # out = torch.clamp(out, 0, 1)  # clamp to [0, 1], otherwise JPEGer will result in unpleasant artifacts
-        # out = self.jpeger(out, quality=jpeg_p)
+        if self.opt["degradation"]['jpeg_range'] is not None:
+            jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.opt["degradation"]['jpeg_range'])
+            out = torch.clamp(out, 0, 1)  # clamp to [0, 1], otherwise JPEGer will result in unpleasant artifacts
+            out = self.jpeger(out, quality=jpeg_p)
 
         # ----------------------- The second degradation process ----------------------- #
         # blur
@@ -147,14 +129,16 @@ class RepSR_Net(nn.Module):
             out = F.interpolate(out, size=(ori_h // self.opt['scale'], ori_w // self.opt['scale']), mode=mode)
             out = filter2D(out, self.sinc_kernel)
             # JPEG compression
-            # jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.opt['jpeg_range2'])
-            # out = torch.clamp(out, 0, 1)
-            # out = self.jpeger(out, quality=jpeg_p)
+            if self.opt["degradation"]['jpeg_range2'] is not None:
+                jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.opt["degradation"]['jpeg_range2'])
+                out = torch.clamp(out, 0, 1)
+                out = self.jpeger(out, quality=jpeg_p)
         else:
             # JPEG compression
-            # jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.opt['jpeg_range2'])
-            # out = torch.clamp(out, 0, 1)
-            # out = self.jpeger(out, quality=jpeg_p)
+            if self.opt["degradation"]['jpeg_range2'] is not None:
+                jpeg_p = out.new_zeros(out.size(0)).uniform_(*self.opt["degradation"]['jpeg_range2'])
+                out = torch.clamp(out, 0, 1)
+                out = self.jpeger(out, quality=jpeg_p)
             # resize back + the final sinc filter
             mode = random.choice(['area', 'bilinear', 'bicubic'])
             out = F.interpolate(out, size=(ori_h // self.opt['scale'], ori_w // self.opt['scale']), mode=mode)
@@ -162,4 +146,7 @@ class RepSR_Net(nn.Module):
 
         # clamp and round
         lq = torch.clamp((out * 255.0).round(), 0, 255) / 255.
+        # if self.opt["colors"]==1:
+        #     self.gt = Fv.rgb_to_grayscale(self.gt)
+        #     lq = Fv.rgb_to_grayscale(lq)
         return self.gt, lq

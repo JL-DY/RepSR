@@ -63,7 +63,7 @@ class DIV2K(data.Dataset):
         
         if self.opt["degradation"]:
             hr = imageio.imread(self.hr_filenames[idx], pilmode="RGB")
-            # hr = cv.imread(self.hr_filenames[idx], cv.IMREAD_GRAYSCALE) / 255.0
+            # hr = cv.imread(self.hr_filenames[idx], cv.IMREAD_UNCHANGED) / 255.0
             if self.colors == 1:
                 hr = sc.rgb2ycbcr(hr)[:, :, 0:1] / 255.0
                 hr = np.array(hr)
@@ -88,7 +88,7 @@ class DIV2K(data.Dataset):
                 return data_dict
 
         else:
-            lr, hr = imageio.imread(self.lr_filenames[idx], pilmode="RGB") / 255.0, imageio.imread(self.hr_filenames[idx], pilmode="RGB")/255.0
+            lr, hr = imageio.imread(self.lr_filenames[idx], pilmode="RGB"), imageio.imread(self.hr_filenames[idx], pilmode="RGB")
             # lr, hr = cv.imread(self.lr_filenames[idx], cv.IMREAD_GRAYSCALE) / 255.0, cv.imread(self.hr_filenames[idx], cv.IMREAD_GRAYSCALE) / 255.0
             if self.colors == 1:
                 lr, hr = sc.rgb2ycbcr(lr)[:, :, 0:1] / 255.0, sc.rgb2ycbcr(hr)[:, :, 0:1] / 255.0

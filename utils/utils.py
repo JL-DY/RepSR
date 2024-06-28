@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 import numpy as np
-from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
+from pytorch_msssim import ssim
+from utils.diffjpeg import diff_round, CompressJpeg, quality_to_factor, DeCompressJpeg
 import torchvision.models as models
 import datetime
 import cv2 as cv
@@ -17,18 +18,6 @@ def calc_psnr(sr, hr):
     return float(psnr)
 
 def calc_ssim(sr, hr):
-    # def ssim(
-    #     X,
-    #     Y,
-    #     data_range=255,
-    #     size_average=True,
-    #     win_size=11,
-    #     win_sigma=1.5,
-    #     win=None,
-    #     K=(0.01, 0.03),
-    #     nonnegative_ssim=False,
-    # )
-    # ssim_val = ssim(sr, hr, data_range=255, size_average=True)
     ssim_val = ssim(sr, hr, data_range=1, size_average=True)
     return float(ssim_val)
     
@@ -171,7 +160,78 @@ def filter2D(img, kernel):
         img = img.view(1, b * c, ph, pw)
         kernel = kernel.view(b, 1, k, k).repeat(1, c, 1, 1).view(b * c, 1, k, k)
         return F.conv2d(img, kernel, groups=b * c).view(b, c, h, w)
-    
+
+
+# JPEG压缩主函数
+class DiffJPEG(nn.Module):
+    """This JPEG algorithm result is slightly different from cv2.
+    DiffJPEG supports batch processing.
+
+    Args:
+        differentiable(bool): If True, uses custom differentiable rounding function, if False, uses standard torch.round
+    """
+
+    def __init__(self, differentiable=True):
+        super(DiffJPEG, self).__init__()
+        if differentiable:
+            rounding = diff_round
+        else:
+            rounding = torch.round
+
+        self.compress = CompressJpeg(rounding=rounding)
+        self.decompress = DeCompressJpeg(rounding=rounding)
+
+    def forward(self, x, quality):
+        """
+        Args:
+            x (Tensor): Input image, bchw, rgb, [0, 1]
+            quality(float): Quality factor for jpeg compression scheme.
+        """
+        factor = quality
+        if isinstance(factor, (int, float)):
+            factor = quality_to_factor(factor)
+        else:
+            for i in range(factor.size(0)):
+                factor[i] = quality_to_factor(factor[i])
+        c, h, w = x.size()[-3:]
+        h_pad, w_pad = 0, 0
+        # why should use 16?
+        if h % 16 != 0:
+            h_pad = 16 - h % 16
+        if w % 16 != 0:
+            w_pad = 16 - w % 16
+        x = F.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
+
+        if c==3:
+            y, cb, cr = self.compress(x, c, factor=factor)
+            recovered = self.decompress(c, y, cb, cr, (h + h_pad), (w + w_pad), factor=factor)
+        else:
+            y = self.compress(x, c, factor=factor)
+            recovered = self.decompress(c, y, None, None, (h + h_pad), (w + w_pad), factor=factor)
+        recovered = recovered[:, :, 0:h, 0:w]
+        return recovered
+
+class USMSharp(torch.nn.Module):
+    def __init__(self, radius=80, sigma=0):
+        super(USMSharp, self).__init__()
+        if radius % 2 == 0:
+            radius += 1
+        self.radius = radius
+        kernel = cv.getGaussianKernel(radius, sigma)
+        kernel = torch.FloatTensor(np.dot(kernel, kernel.transpose())).unsqueeze_(0)
+        self.register_buffer('kernel', kernel)
+        
+    def forward(self, img, weight=0.9, threshold=30):
+        blur = filter2D(img, self.kernel)
+        residual = img - blur
+
+        mask = torch.abs(residual) * 255 > threshold
+        mask = mask.float()
+        soft_mask = filter2D(mask, self.kernel)
+        sharp = img + weight * residual
+        sharp = torch.clip(sharp, 0, 1)
+        return soft_mask * sharp + (1 - soft_mask) * img
+
 # 感知损失
 class PerceptualLoss():
 	def contentFunc(self):

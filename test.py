@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     model_repsr = RepSR_Net(m=4, c=16, scale=4, colors=model_channel, opt=opt, device=device).to(device)
 
-    model_repsr.load_state_dict(torch.load("./weights/Repsr-x4-m4c16-2024-0619-1731/models/model_x4_893.pt", map_location=device))
+    model_repsr.load_state_dict(torch.load("./weights/Repsr-x4-m4c16-2024-0628-1054/models/model_x4_9.pt", map_location=device))
     model_repsr.eval()
 
     path = os.listdir(input_folder)

@@ -3,15 +3,14 @@ scale: 4
 colors: 1
 m_block: 4
 c_channel: 16
-pretrain: Null
-
+pretrain: null
 ## parameters for model training
 ## 小模型：patch_size=64,batch_size=32,lr=4*10-4; 大模型：patch_size=48,batch_size=32,lr=2*10-4
-patch_size: 400
+patch_size: 120
 batch_size: 32
 data_augment: 1
-epochs: 1000
-log_every: 100
+epochs: 200
+log_every: 1000
 test_every: 1
 log_path: "./weights"
 lr: 0.0004
@@ -51,7 +50,7 @@ degradation:
   noise_range: [1, 3]
   poisson_scale_range: [0.05, 0.3]
   gray_noise_prob: 0.2
-  jpeg_range: [90, 95] # 更改了jpeg有损压缩
+  jpeg_range: [90, 95]
 
   # the second degradation process
   second_blur_prob: 0.35
@@ -61,10 +60,11 @@ degradation:
   noise_range2: [1, 3]
   poisson_scale_range2: [0.05, 0.15]
   gray_noise_prob2: 0.1
-  jpeg_range2: [90, 95] # 更改了jpeg有损压缩
+  jpeg_range2: [90, 95] 
 
 ## data specification
-div2k_hr_path: /media/Data/jl/sr_data/DIV2K/DIV2K_train_HR
+div2k_hr_path: /media/Work/Dataset/Super-Resolution-rgb/ULTIMATE_SR_DATASET_HR_TRAIN_bmp_CUT1_40_and_INF/
+# div2k_hr_path: /media/Data/jl/sr_data/DIV2K/DIV2K_train_HR
 div2k_lr_path: /media/Data/jl/sr_data/DIV2K/DIV2K_train_LR_bicubic  # 采用两阶段退化过程时，低分辨率图像由高分辨率图像生成
 set5_hr_path: /media/Data/jl/sr_data/benchmark/Set5/HR
 set5_lr_path: /media/Data/jl/sr_data/benchmark/Set5/LR_bicubic
