@@ -2,12 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from model.RepSRNet import RepSR_Net
-from torch.utils.data import DataLoader
-import math
+from model.Plain_Dn import RepSR_Plain
+from utils.Rep_params import rep_params
 import argparse, yaml
-import utils
 import os
-from tqdm import tqdm
 import cv2
 import numpy as np
 
@@ -21,17 +19,21 @@ if args.config:
     opt.update(yaml_args)
 
 if __name__ == '__main__':
-    device = torch.device('cuda')
+    device = torch.device('cuda:0')
     input_folder = "input_img"
-    re_parameterized = 0  # 是否进行结构重新参数化,暂未实现
+    re_parameterized = 1  # 是否进行结构重新参数化
     model_channel = 1     # 模型的输入
     img_channel = 1 # 单通道图像or三通道
     img_range = 1 # 图像数据范围是0-1 or 0-255
 
     model_repsr = RepSR_Net(m=4, c=16, scale=4, colors=model_channel, opt=opt, device=device).to(device)
+    model_plain = RepSR_Plain(m=4, c=16, scale=4, colors=model_channel, device=device).to(device)
 
-    model_repsr.load_state_dict(torch.load("./weights/Repsr-x4-m4c16-2024-0628-1054/models/model_x4_9.pt", map_location=device))
+    model_repsr.load_state_dict(torch.load("./weights/degradation_m4c16_1:40_usm80-0-0.9-30_jpeg/models/best_model.pt", map_location=device))
     model_repsr.eval()
+    if re_parameterized:
+        model_plain = rep_params(model_repsr, model_plain, opt, device)
+        model_plain.eval()
 
     path = os.listdir(input_folder)
     for i in path:
@@ -46,7 +48,10 @@ if __name__ == '__main__':
         
             Y_channel = torch.tensor(Y_channel).to(device)
             with torch.no_grad():
-                result = model_repsr(Y_channel)
+                if re_parameterized:
+                    result = model_plain(Y_channel)
+                else:
+                    result = model_repsr(Y_channel)
             result = result[0].cpu().numpy()
             result = np.clip(result, 0, img_range)
             result = np.array(result*(255/img_range), dtype=np.uint8)
@@ -57,14 +62,17 @@ if __name__ == '__main__':
             new_CrCb = cv2.resize(CrCb, (new_w, new_h))
             new_result = cv2.merge((result, new_CrCb))
             new_result = cv2.cvtColor(new_result, cv2.COLOR_YCrCb2BGR)
-            cv2.imwrite(img_path.replace(input_folder, "output_img"), result)
+            cv2.imwrite(img_path.replace(input_folder, "output_img"), new_result)
 
         if model_channel==1 and img_channel==1:
             img = np.array(np.expand_dims(np.expand_dims(img, axis=0), axis=0), dtype=np.float32)/255
         
             img = torch.tensor(img).to(device)
             with torch.no_grad():
-                result = model_repsr(img)
+                if re_parameterized:
+                    result = model_plain(img)
+                else:
+                    result = model_repsr(img)
             result = result[0].cpu().numpy()
             result = np.clip(result, 0, img_range)
             result = np.array(result*(255/img_range), dtype=np.uint8)
@@ -78,7 +86,10 @@ if __name__ == '__main__':
 
             img = torch.tensor(img).to(device)
             with torch.no_grad():
-                result = model_repsr(img)
+                if re_parameterized:
+                    result = model_plain(img)
+                else:
+                    result = model_repsr(img)
             result = result[0].cpu().numpy()
             result = np.clip(result, 0, img_range)
             result = np.array(result*(255/img_range), dtype=np.uint8)
