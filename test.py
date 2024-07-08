@@ -9,7 +9,6 @@ import os
 import cv2
 import numpy as np
 
-
 parser = argparse.ArgumentParser(description='RepSR')
 parser.add_argument('--config', type=str, default="./configs/RepSR_m4c16.yml", help = 'pre-config file for training')
 args = parser.parse_args()
@@ -26,14 +25,16 @@ if __name__ == '__main__':
     img_channel = 1 # 单通道图像or三通道
     img_range = 1 # 图像数据范围是0-1 or 0-255
 
-    model_repsr = RepSR_Net(m=4, c=16, scale=4, colors=model_channel, opt=opt, device=device).to(device)
-    model_plain = RepSR_Plain(m=4, c=16, scale=4, colors=model_channel, device=device).to(device)
+    model_repsr = RepSR_Net(m=opt["m_block"], c=opt["c_channel"], scale=opt["scale"], colors=opt["colors"], 
+                            opt=opt, device=device).to(device)
+    model_plain = RepSR_Plain(m=opt["m_block"], c=opt["c_channel"], scale=opt["scale"], colors=opt["colors"], device=device).to(device)
 
-    model_repsr.load_state_dict(torch.load("./weights/degradation_m4c16_1:40_usm80-0-0.9-30_jpeg/models/best_model.pt", map_location=device))
+    model_repsr.load_state_dict(torch.load("./weights/Repsr-x4-m4c64-2024-0705-1023/models/model_x4_5.pt", map_location=device))
     model_repsr.eval()
     if re_parameterized:
         model_plain = rep_params(model_repsr, model_plain, opt, device)
         model_plain.eval()
+        # torch.save(model_plain.state_dict(), "./weights/plain_repsr_m4c64_nojpg.pt")
 
     path = os.listdir(input_folder)
     for i in path:
@@ -56,7 +57,6 @@ if __name__ == '__main__':
             result = np.clip(result, 0, img_range)
             result = np.array(result*(255/img_range), dtype=np.uint8)
             result = np.transpose(result, (1, 2, 0))
-            # result = Edge_Addweight(result, 5, 0.7).edge_addweight()
 
             new_h, new_w, new_c = np.shape(result)
             new_CrCb = cv2.resize(CrCb, (new_w, new_h))
@@ -77,7 +77,6 @@ if __name__ == '__main__':
             result = np.clip(result, 0, img_range)
             result = np.array(result*(255/img_range), dtype=np.uint8)
             result = np.transpose(result, (1, 2, 0))
-            # result = Edge_Addweight(result, 5, 0.7).edge_addweight()
             cv2.imwrite(img_path.replace(input_folder, "output_img"), result)
 
         if model_channel == 3 and img_channel==3:
