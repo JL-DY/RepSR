@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from utils.benchmark import Benchmark
-from utils.div2k import DIV2K
+from utils.div2k import DIV2K, Train_120
 from model.RepSRNet import RepSR_Net
 import math
 import argparse, yaml
@@ -37,7 +37,7 @@ if __name__ == '__main__':
         device = torch.device('cpu')
     torch.set_num_threads(args.threads)
 
-    div2k = DIV2K(
+    div2k = Train_120(
         opt,
         args.div2k_hr_path, 
         args.div2k_lr_path, 
@@ -108,8 +108,11 @@ if __name__ == '__main__':
         print("##===========Epoch: {}=============##".format(epoch))
         for iter, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
-            # lr, hr = batch
-            hr, lr = model.feed_data(batch)
+            if args.use_degradation:
+                hr, lr = model.feed_data(batch)
+            else:
+                lr, hr = batch
+                lr, hr = lr.to(device), hr.to(device)
             sr = model(lr)
             loss = loss_func(sr, hr)
             loss.backward()
